@@ -499,10 +499,609 @@ for(i in 1:nrow(sj_CD45)){
 
 	axis(side = 3, at = 1:6, tick = F, labels = table(test[test$SJ>0,]$`CellType`), line = -1)
 
-	}
-
-	
+	}	
 }
 
 dev.off()
+
+
+
+
+library(vioplot)
+library(beanplot)
+pdf("/mnt/data5/BGI/UCB/tangchao/CD45/Meaningful_SJ_in_cells_boxplot_and_vioplot.pdf")
+par(mar=c(8.1, 4.1, 4.1, 8.1), xpd=TRUE)
+for(i in 1:nrow(sj_CD45)){
+  print(i)
+  test <- data.frame(cell = row.names(celltype), CellType = celltype$`Cell type`,SJ = sj_CD45[i,])
+  test[test==0] <- NA
+
+  if(sum(test$SJ, na.rm = T) > 0 & sd(test$SJ, na.rm = T) > 0 & sum(!is.na(test$SJ)) > 500){
+    boxplot(SJ~CellType, test, boxwex = 0.25, col = "yellow", xaxt='n', main = row.names(sj_CD45)[i])
+  axis(side = 1, at = 1:6,line = .3, tick = F, cex.axis=1, las = 2, 
+     labels = paste(names(table(celltype$`Cell type`)),"\n", table(celltype$`Cell type`)))
+
+  axis(side = 3, at = 1:6, tick = F, labels = table(test[test$SJ>0,]$`CellType`), line = -1)
+
+
+  test2 <- test[!is.na(test$SJ),c("CellType", "SJ")]
+
+  if(sum(lapply(split(test2, test2$CellType), function(x) sd(x$SJ))==0) == 0){
+    print(i)
+      vioplot(split(test2, test2$CellType)[[1]]$SJ,
+        split(test2, test2$CellType)[[2]]$SJ,
+        split(test2, test2$CellType)[[3]]$SJ,
+        split(test2, test2$CellType)[[4]]$SJ,
+        split(test2, test2$CellType)[[5]]$SJ,
+        split(test2, test2$CellType)[[6]]$SJ, 
+        names = F, main = row.names(sj_CD45)[i])
+      axis(side = 1, at = 1:6,line = .3, tick = F, cex.axis=1, las = 2, 
+     labels = paste(levels(test2$CellType),"\n", table(celltype$`Cell type`)))
+
+  axis(side = 3, at = 1:6, labels = table(test[test$SJ>0,]$`CellType`), tick = F, las = 1)
+
+}
+}  
+}
+
+dev.off()
+
+
+
+
+
+#### Seurat of intron-centric PSI ============================
+
+
+
+setwd("/mnt/data5/BGI/UCB/tangchao/Seurat/CDC45")
+
+library(Seurat)
+apply(sj_CD45,1,sd) -> sj_CD45_sd
+apply(sj_CD45,1,function(x) sum(x>0)) -> sj_CD45_mc
+sj_CD45 <- sj_CD45[sj_CD45_sd!=0,]
+
+
+row.names(sj_CD45) -> CD45_SJ
+row.names(sj_CD45) <- paste("SJ",1:nrow(sj_CD45))
+
+sj_CD45_2 <- t(t(sj_CD45)[!duplicated(t(sj_CD45)),])
+
+ucb <- CreateSeuratObject( raw.data = sj_CD45_2, min.cells = 1, min.genes = 1, is.expr = 0, project="CD45")
+
+
+# 3. Normalizing the data
+#ucb <- NormalizeData(object = ucb, normalization.method = "LogNormalize", scale.factor = 10000)
+
+# 4. Detection of variable genes across the single cells
+pdf("Filter_genes.pdf",width = 8,height = 7)
+ucb <- FindVariableGenes(object = ucb, mean.function = ExpMean, dispersion.function = LogVMR, x.low.cutoff = 0.2, x.high.cutoff = 4, y.cutoff = -3)
+length(x = ucb@var.genes)
+## 2052 genes left
+dev.off()
+
+# 5. Scaling the data
+ucb <- ScaleData(ucb)  #add 'do.cpp=F' if an error occurs
+
+# 6. Perform linear dimensional reduction (PCA)
+pdf("Select_pc.pdf",width = 8,height = 7)
+ucb <- RunPCA(ucb, pc.genes = ucb@var.genes, do.print = TRUE, pcs.print = 1:5, genes.print = 5)
+VizPCA(object = ucb, pcs.use = 1:4)
+PCAPlot(ucb, dim.1 = 1, dim.2 = 2)
+ucb = ProjectPCA(object = ucb, do.print = FALSE)
+PCHeatmap(object = ucb, pc.use = 1:12, cells.use = 500, do.balanced = TRUE, label.columns = FALSE)
+# good: PC1-11
+
+# 7. Determine statistically significant principal components
+ucb <- JackStraw(object = ucb, num.replicate = 100, do.print = FALSE)
+JackStrawPlot(object = ucb, PCs = 1:4)
+# good: PC1-15
+PCElbowPlot(object = ucb)
+dev.off()
+## good: PC1-10
+
+# 8. Cluster the cells
+ucb <- FindClusters(ucb, reduction.type = "pca", dims.use = 1:4, resolution = 0.1, print.output = 0, save.SNN = TRUE, temp.file.location="./")
+PrintFindClustersParams(ucb)
+
+# 9. Run Non-linear dimensional reduction (tSNE)
+ucb <- RunTSNE(object = ucb, dims.use = 1:4, do.fast = TRUE)
+pdf("tSNE.pdf",width = 8,height = 7)
+TSNEPlot(object = ucb, do.label = TRUE, pt.size = 1.5, label.size=6)
+dev.off()
+
+
+
+
+
+
+#### Rtsne ========================================================================
+
+
+library(Rtsne)
+t(sj_CD45)[!duplicated(t(sj_CD45)),] -> test
+tsne_out <- Rtsne(test, perplexity=560, theta = 1)
+plot(tsne_out$Y, xlab = "t-SNE1", ylab = "t-SNE2", main = "UCB SE psi",pch = 20,
+     cex = .5)
+
+as.data.frame(tsne_out$Y) -> test2
+test2$V3 <- celltype[row.names(test),]
+
+plot(x = test2$V1, y = test2$V2, xlab = "t-SNE1", ylab = "t-SNE2", main = "CD45 Rtsne",pch = 20,
+     cex = .8, col = as.numeric(test2$V3))
+legend(x = 6.4, y = 1,legend = levels(test2$V3), pch = 20, col = 1:6, bty = "n", cex = .6)
+
+sum(colSums(test>0)>=10)
+test[,colSums(test>0)>=10] -> test3
+test3[,apply(test3,2,function(x){sd(x[x>0])})>.3] ->test3
+test3[!duplicated(test3),] -> test3
+tsne_out2 <- Rtsne(test3, perplexity=300, theta = 1)
+plot(tsne_out2$Y, xlab = "t-SNE1", ylab = "t-SNE2", main = "UCB SE psi",pch = 20,
+     cex = .5)
+
+as.data.frame(tsne_out2$Y) -> test4
+test4$V3 <- celltype[row.names(test3),]
+
+plot(x = test4$V1, y = test4$V2, xlab = "t-SNE1", ylab = "t-SNE2", main = "CD45 Rtsne",pch = 20,
+     cex = .8, col = as.numeric(test4$V3))
+legend(x = 5, y = 2,legend = levels(test4$V3), pch = 20, col = 1:6, bty = "n", cex = .6)
+
+
+
+
+
+
+
+
+
+
+#### CD45 RABC =================================================================================================================================
+
+
+
+load("/mnt/data5/BGI/UCB/tangchao/data/SJ/SJ_merged_raw_te.RData")
+library(data.table)
+SJ1 = "1:198692374-198696711"
+SJ2 = "1:198692374-198699563"
+SJ3 = "1:198696910-198699563"
+SJ4 = "1:198696910-198702386"
+SJ5 = "1:198699705-198702386"
+SJ6 = "1:198699705-198703297"
+SJ7 = "1:198702531-198703297"
+SJ8 = "1:198692374-198703297"
+SJ9 = "1:198696910-198703297"
+SJ10= "1:198692374-198702386"
+
+te[.(c(SJ1,SJ2,SJ3,SJ4,SJ5,SJ6,SJ7,SJ8,SJ9,SJ10)),1:5]
+as.data.frame(te[.(c(SJ1,SJ2,SJ3,SJ4,SJ5,SJ6,SJ7,SJ8,SJ9,SJ10))])[,-1] -> CD45_SJ
+
+CD45_SJ[is.na(CD45_SJ)] <- 0
+CD45_SJ[CD45_SJ<2] <- 0
+
+
+CD45_R <- character()
+for (i in 1:ncol(CD45_SJ)) {
+  if(sum(CD45_SJ[,i]) == 0){
+    R <- "CD45-"
+  }else{
+      if(CD45_SJ[8,i] > 0){
+    R1 <- "RO"
+  }else{
+    R1 <- NULL
+  }
+  if(CD45_SJ[4,i] > 0){
+    R2 <- "RAC"
+  }else{
+    R2 <- NULL
+  }
+  if(CD45_SJ[2,i] > 0 & CD45_SJ[4,i] == 0 & CD45_SJ[6,i] == 0){
+    R3 <- "RBC"
+  }else{
+    R3 <- NULL
+  }
+  if(CD45_SJ[2,i] == 0 & CD45_SJ[4,i] == 0 & CD45_SJ[6,i] > 0){
+    R4 <- "RAB"
+  }else{
+    R4 <- NULL
+  }
+  if(CD45_SJ[9,i] > 0){
+    R5 <- "RA"
+  }else{
+    R5 <- NULL
+  }
+  if(CD45_SJ[10,i] > 0){
+    R6 <- "RC"
+  }else{
+    R6 <-NULL
+  }
+  if(CD45_SJ[2,i] > 0 & CD45_SJ[6,i] > 0){
+    R7 <- "RB"
+  }else{
+    R7 <- NULL
+  }
+  if(CD45_SJ[2,i] < 0 & CD45_SJ[4,i] < 0 & CD45_SJ[6,i] < 0 & CD45_SJ[8,i] < 0 & CD45_SJ[4,i] < 0 & CD45_SJ[9,i] < 0 & CD45_SJ[10,i] < 0){
+    R8 <- "RABC"
+  }else{
+    R8 <- NULL
+  }
+  else{
+    R9 <- "Other"
+  }
+  R <- paste(R1,R2,R3,R4,R5,R6,R7,R8,R9,sep = "|")
+  }
+  CD45_R[i] <- R
+}
+
+
+
+
+
+
+CD45_R <- character()
+for (i in 1:ncol(CD45_SJ)) {
+  if(sum(CD45_SJ[,i]) == 0){
+    R <- "CD45-"
+  }else{
+    R <- NULL
+  }
+  if(CD45_SJ[8,i] > 0){
+    R1 <- "RO"
+  }else{
+    R1 <- NULL
+  }
+  if(CD45_SJ[4,i] > 0){
+    R2 <- "RAC"
+  }else{
+    R2 <- NULL
+  }
+  if(CD45_SJ[2,i] > 0 & CD45_SJ[4,i] == 0 & CD45_SJ[6,i] == 0){
+    R3 <- "RBC"
+  }else{
+    R3 <- NULL
+  }
+  if(CD45_SJ[2,i] == 0 & CD45_SJ[4,i] == 0 & CD45_SJ[6,i] > 0){
+    R4 <- "RAB"
+  }else{
+    R4 <- NULL
+  }
+  if(CD45_SJ[9,i] > 0){
+    R5 <- "RA"
+  }else{
+    R5 <- NULL
+  }
+  if(CD45_SJ[10,i] > 0){
+    R6 <- "RC"
+  }else{
+    R6 <-NULL
+  }
+  if(CD45_SJ[2,i] > 0 & CD45_SJ[6,i] > 0){
+    R7 <- "RB"
+  }else{
+    R7 <- NULL
+  }
+  if(CD45_SJ[2,i] < 0 & CD45_SJ[4,i] < 0 & CD45_SJ[6,i] < 0 & CD45_SJ[8,i] < 0 & CD45_SJ[4,i] < 0 & CD45_SJ[9,i] < 0 & CD45_SJ[10,i] < 0){
+    R8 <- "RABC"
+  }else{
+    R8 <- NULL
+  }
+
+  RE <- paste(c(R, R1,R2,R3,R4,R5,R6,R7,R8),collapse = "|")
+  if(is.null(R) & is.null(R1) & is.null(R2) & is.null(R3) & is.null(R4) & is.null(R5) & is.null(R6) & is.null(R7) & is.null(R8)){
+    RE <- "Other"
+  }
+  
+  CD45_R[i] <- RE
+}
+
+
+CD45_R_tab <- CD45_SJ[1:9,]
+row.names(CD45_R_tab) <- c("CD45-","RO","RAC","RBC","RAB","RA","RC","RB","RABC")
+CD45_R_tab[CD45_R_tab>0] <- 0
+for (i in 1:ncol(CD45_SJ)) {
+  if(sum(CD45_SJ[,i]) == 0){
+    CD45_R_tab["CD45-",i] <- 1
+  }
+  if(CD45_SJ[8,i] > 0){
+    CD45_R_tab["RO",i] <- 1
+  }
+  if(CD45_SJ[4,i] > 0){
+    CD45_R_tab["RAC",i] <- 1
+  }
+  if(CD45_SJ[2,i] > 0 & CD45_SJ[4,i] == 0 & CD45_SJ[6,i] == 0){
+    CD45_R_tab["RBC",i] <- 1
+  }
+  if(CD45_SJ[2,i] == 0 & CD45_SJ[4,i] == 0 & CD45_SJ[6,i] > 0){
+    CD45_R_tab["RAB",i] <- 1
+  }
+  if(CD45_SJ[9,i] > 0){
+    CD45_R_tab["RA",i] <- 1
+  }
+  if(CD45_SJ[10,i] > 0){
+    CD45_R_tab["RC",i] <- 1
+  }
+  if(CD45_SJ[2,i] > 0 & CD45_SJ[6,i] > 0){
+    CD45_R_tab["RB",i] <- 1
+  }
+  if(sum(CD45_SJ[,i]) > 0 & CD45_SJ[2,i] == 0 & CD45_SJ[4,i] == 0 & CD45_SJ[6,i] == 0 & CD45_SJ[8,i] == 0 & CD45_SJ[9,i] == 0 & CD45_SJ[10,i] == 0){
+    CD45_R_tab["RABC",i] <- 1
+  }
+}
+
+
+
+load("/mnt/data5/BGI/UCB/ExpMat_NewID/Seurat.RData")
+tsne <- as.data.frame(Combine@dr$tsne@cell.embeddings)
+
+colnames(CD45_R_tab) <- substr(colnames(CD45_R_tab),1,10)
+CD45_R_tab[,row.names(tsne)] -> CD45_R_tab
+
+par(mar=c(5.1, 4.1, 4.1, 8.1), xpd=TRUE)
+plot(tsne, pch = 20, cex = 0)
+# CD45-
+points(tsne[colnames(CD45_R_tab)[CD45_R_tab[1,] > 0],], pch = 20, col = rainbow(1, start = .1, alpha = .4))
+# RO
+points(tsne[colnames(CD45_R_tab)[CD45_R_tab[2,] > 0],], pch = 20, col = rainbow(1, start = .2, alpha = .4))
+# RAC
+points(tsne[colnames(CD45_R_tab)[CD45_R_tab[3,] > 0],], pch = 20, col = rainbow(1, start = .3, alpha = .4))
+# RBC
+points(tsne[colnames(CD45_R_tab)[CD45_R_tab[4,] > 0],], pch = 20, col = rainbow(1, start = .4, alpha = .4))
+# RAB
+points(tsne[colnames(CD45_R_tab)[CD45_R_tab[5,] > 0],], pch = 20, col = rainbow(1, start = .5, alpha = .4))
+# RA
+points(tsne[colnames(CD45_R_tab)[CD45_R_tab[6,] > 0],], pch = 20, col = rainbow(1, start = .6, alpha = .4))
+# RC
+points(tsne[colnames(CD45_R_tab)[CD45_R_tab[7,] > 0],], pch = 20, col = rainbow(1, start = .7, alpha = .4))
+# RB 
+points(tsne[colnames(CD45_R_tab)[CD45_R_tab[8,] > 0],], pch = 20, col = rainbow(1, start = .8, alpha = .4))
+# RABC
+points(tsne[colnames(CD45_R_tab)[CD45_R_tab[9,] > 0],], pch = 20, col = rainbow(1, start = .9, alpha = .4))
+legend(x = 24,y = 36, legend = row.names(CD45_R_tab), pch = 20, cex = 1.2, col = rainbow(9,start = .1,end = .9), bty = "n")
+rowSums(CD45_R_tab)
+
+par(mfrow = c(3,3), mar = c(0.5,0.5,1,0.5))
+for(i in 1:9){
+  plot(tsne, pch = 20, cex = 0, main = row.names(CD45_R_tab)[i], xaxt="n",  yaxt="n")
+  points(tsne[colnames(CD45_R_tab)[CD45_R_tab[i,] > 0],], pch = 20, col = rainbow(1, start = i/10))
+}
+
+
+table(colSums(CD45_R_tab))
+x = barplot(table(colSums(CD45_R_tab)), ylim = c(0,3000))
+text(x = x, y = table(colSums(CD45_R_tab))+100, labels = table(colSums(CD45_R_tab)))
+
+CD45_R_tab[,colSums(CD45_R_tab)==3]
+
+rowSums(CD45_R_tab[,colSums(CD45_R_tab)==2])
+CD45_R_tab[,colSums(CD45_R_tab)==2][,which(CD45_R_tab[,colSums(CD45_R_tab)==2][2,]==0)]
+
+
+
+#### Use the juction reads information also =======================================================================================
+
+
+CD45_R_r_tab <- CD45_SJ[1:9,]
+row.names(CD45_R_r_tab) <- c("CD45-","RO","RAC","RBC","RAB","RA","RC","RB","RABC")
+CD45_R_r_tab[CD45_R_r_tab>0] <- 0
+for (i in 1:ncol(CD45_SJ)) {
+  if(sum(CD45_SJ[,i]) == 0){
+    CD45_R_r_tab["CD45-",i] <- 1
+  }
+  if(CD45_SJ[8,i] > 0){
+    CD45_R_r_tab["RO",i] <- CD45_SJ[8,i]
+  }
+  if(CD45_SJ[4,i] > 0){
+    CD45_R_r_tab["RAC",i] <- CD45_SJ[4,i]
+  }
+  if(CD45_SJ[2,i] > 0 & CD45_SJ[4,i] == 0 & CD45_SJ[6,i] == 0){
+    CD45_R_r_tab["RBC",i] <- CD45_SJ[2,i]
+  }
+  if(CD45_SJ[2,i] == 0 & CD45_SJ[4,i] == 0 & CD45_SJ[6,i] > 0){
+    CD45_R_r_tab["RAB",i] <- CD45_SJ[6,i]
+  }
+  if(CD45_SJ[9,i] > 0){
+    CD45_R_r_tab["RA",i] <- CD45_SJ[9,i]
+  }
+  if(CD45_SJ[10,i] > 0){
+    CD45_R_r_tab["RC",i] <- CD45_SJ[10,i]
+  }
+  if(CD45_SJ[2,i] > 0 & CD45_SJ[6,i] > 0){
+    CD45_R_r_tab["RB",i] <- mean(CD45_SJ[2,i], CD45_SJ[6,i])
+  }
+  if(sum(CD45_SJ[,i]) > 0 & CD45_SJ[2,i] == 0 & CD45_SJ[4,i] == 0 & CD45_SJ[6,i] == 0 & CD45_SJ[8,i] == 0 & CD45_SJ[9,i] == 0 & CD45_SJ[10,i] == 0){
+    CD45_R_r_tab["RABC",i] <- mean(CD45_SJ[c(1,3,5,7),i])
+}
+}
+
+
+colnames(CD45_R_r_tab) <- substr(colnames(CD45_R_r_tab),1,10)
+CD45_R_r_tab[,row.names(tsne)] -> CD45_R_r_tab
+
+CD45_R_r_tab[,1:5]
+CD45_R_r_tab[,colSums(CD45_R_r_tab>0)==3]
+CD45_R_r_tab[,colSums(CD45_R_r_tab>0)==2][,1:10]
+
+apply(CD45_R_r_tab, 2, function(x) round(x/sum(x),2)) -> tang
+
+tang[,colSums(tang>0)==2] -> test
+
+hist(as.numeric(apply(test,2,function(x){ 1-max(x/sum(x)) })), breaks = 20, main = "", xlab = "Fraction of minor subset")
+plot(density(as.numeric(apply(test,2,function(x){ 1-max(x/sum(x)) })), adjust = 0.2 ), main = "", xlab = "Fraction of minor subset")
+abline(v = 0.05, col = 2)
+
+
+tang[tang < 0.05] <- 0
+tang[,colSums(tang>0)==2][,1:10]
+tang[tang>0] <- 1
+
+table(colSums(tang))
+x = barplot(table(colSums(tang)), ylim = c(0,3400))
+text(x = x, y = table(colSums(tang))+200, labels = table(colSums(tang)))
+par(mfrow = c(3,3), mar = c(0.5,0.5,1,0.5))
+for(i in 1:9){
+  plot(tsne, pch = 20, cex = 1, main = row.names(tang)[i], xaxt="n",  yaxt="n", col = gray(0.9))
+  points(tsne[colnames(tang)[tang[i,] > 0],], pch = 20, cex = .2, col = rainbow(1, start = i/10))
+}
+
+
+
+
+dim(CD45_R_r_tab)
+dim(tang)
+identical(colnames(CD45_R_r_tab),colnames(tang))
+
+CD45_R_r_tab -> chao
+chao[tang==0] <- 0
+apply(chao,1,summary)
+
+chao[,colSums(chao>0)==2][,1:10]
+
+
+ggplot(data = tsne, aes(x = tSNE_1, y = tSNE_2))+
+  geom_point(aes(colour = log(as.numeric(chao[9,]+1))), alpha = 1, size = .8,
+             position = position_jitter(.2, .2))+
+  scale_colour_gradient(high = 'red',low = 'Grey', guide = F)
+
+ggplot(data = tsne, aes(x = tSNE_1, y = tSNE_2))+
+  geom_point(aes(colour = log(as.numeric(chao[8,]+1))), alpha = 1, size = .8,
+             position = position_jitter(.2, .2))+
+  scale_colour_gradient(high = 'red',low = 'Grey', guide = F)
+
+
+
+
+ggplot(data = tsne, aes(x = tSNE_1, y = tSNE_2))+
+  geom_point(aes(colour = log10(as.numeric(chao[9,]+1))), alpha = 1, size = .8,
+             position = position_jitter(.2, .2))+
+  scale_colour_gradient(high = 'red',low = 'Grey', guide = F)
+
+ggplot(data = tsne, aes(x = tSNE_1, y = tSNE_2))+
+  geom_point(aes(colour = log10(as.numeric(chao[8,]+1))), alpha = 1, size = .8,
+             position = position_jitter(.2, .2))+
+  scale_colour_gradient(high = 'red',low = 'Grey', guide = F)+
+  ggtitle(row.names(chao)[8])+
+  theme(legend.position = "none",
+          axis.title = element_blank(),
+          axis.text= element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank(),
+          panel.border = element_blank())
+
+t(t(chao)[order(t(chao)[,1]),]) -> chao1
+f1 <- ggplot(data = tsne[colnames(chao1),], aes(x = tSNE_1, y = tSNE_2))+
+  geom_point(aes(colour = log10(as.numeric(chao1[1,]+1))), size = .2)+
+  scale_colour_gradient(high = 'red',low = 'Grey', guide = F)+
+  ggtitle("R-")+
+  theme(legend.position = "none",
+        axis.title = element_blank(),
+        axis.text= element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank())
+
+t(t(chao)[order(t(chao)[,2]),]) -> chao2
+f2 <- ggplot(data = tsne[colnames(chao2),], aes(x = tSNE_1, y = tSNE_2))+
+  geom_point(aes(colour = log10(as.numeric(chao2[2,]+1))), size = .2)+
+  scale_colour_gradient(high = 'red',low = 'Grey', guide = F)+
+  ggtitle(row.names(chao2)[2])+
+  theme(legend.position = "none",
+        axis.title = element_blank(),
+        axis.text= element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank())
+
+t(t(chao)[order(t(chao)[,3]),]) -> chao3
+f3 <- ggplot(data = tsne[colnames(chao3),], aes(x = tSNE_1, y = tSNE_2))+
+  geom_point(aes(colour = log10(as.numeric(chao3[3,]+1))), size = .2)+
+  scale_colour_gradient(high = 'red',low = 'Grey', guide = F)+
+  ggtitle(row.names(chao3)[3])+
+  theme(legend.position = "none",
+        axis.title = element_blank(),
+        axis.text= element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank())
+
+t(t(chao)[order(t(chao)[,4]),]) -> chao4
+f4 <- ggplot(data = tsne[colnames(chao4),], aes(x = tSNE_1, y = tSNE_2))+
+  geom_point(aes(colour = log10(as.numeric(chao4[4,]+1))), size = .2)+
+  scale_colour_gradient(high = 'red',low = 'Grey', guide = F)+
+  ggtitle(row.names(chao4)[4])+
+  theme(legend.position = "none",
+        axis.title = element_blank(),
+        axis.text= element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank())
+
+t(t(chao)[order(t(chao)[,5]),]) -> chao5
+f5 <- ggplot(data = tsne[colnames(chao5),], aes(x = tSNE_1, y = tSNE_2))+
+  geom_point(aes(colour = log10(as.numeric(chao5[5,]+1))), size = .2)+
+  scale_colour_gradient(high = 'red',low = 'Grey', guide = F)+
+  ggtitle(row.names(chao5)[5])+
+  theme(legend.position = "none",
+        axis.title = element_blank(),
+        axis.text= element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank())
+
+t(t(chao)[order(t(chao)[,6]),]) -> chao6
+f6 <- ggplot(data = tsne[colnames(chao6),], aes(x = tSNE_1, y = tSNE_2))+
+  geom_point(aes(colour = log10(as.numeric(chao6[6,]+1))), size = .2)+
+  scale_colour_gradient(high = 'red',low = 'Grey', guide = F)+
+  ggtitle(row.names(chao6)[6])+
+  theme(legend.position = "none",
+        axis.title = element_blank(),
+        axis.text= element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank())
+
+t(t(chao)[order(t(chao)[,7]),]) -> chao7
+f7 <- ggplot(data = tsne[colnames(chao7),], aes(x = tSNE_1, y = tSNE_2))+
+  geom_point(aes(colour = log10(as.numeric(chao7[7,]+1))), size = .2)+
+  scale_colour_gradient(high = 'red',low = 'Grey', guide = F)+
+  ggtitle(row.names(chao7)[7])+
+  theme(legend.position = "none",
+        axis.title = element_blank(),
+        axis.text= element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank())
+
+t(t(chao)[order(t(chao)[,8]),]) -> chao8
+f8 <- ggplot(data = tsne[colnames(chao8),], aes(x = tSNE_1, y = tSNE_2))+
+  geom_point(aes(colour = log10(as.numeric(chao8[8,]+1))), size = .2)+
+  scale_colour_gradient(high = 'red',low = 'Grey', guide = F)+
+  ggtitle(row.names(chao8)[8])+
+  theme(legend.position = "none",
+        axis.title = element_blank(),
+        axis.text= element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank())
+
+t(t(chao)[order(t(chao)[,9]),]) -> chao9
+f9 <- ggplot(data = tsne[colnames(chao9),], aes(x = tSNE_1, y = tSNE_2))+
+  geom_point(aes(colour = log10(as.numeric(chao9[9,]+1))), size = .2)+
+  scale_colour_gradient(high = 'red',low = 'Grey', guide = F)+
+  ggtitle(row.names(chao9)[9])+
+  theme(legend.position = "none",
+        axis.title = element_blank(),
+        axis.text= element_blank(),
+        axis.line = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank())
+
+
+
+
+library(cowplot)
+plot_grid(f1, f2, f3, f4, f5, f6, f7, f8, f9, ncol = 3)
+
+
+
+
+
 
