@@ -941,3 +941,47 @@ plot_grid(p1, p2, p3, p4, p5, p6, p7, p8, ncol = 2)
 dev.off()
 
 
+
+
+#### novel pattern
+
+
+load("/mnt/data5/BGI/UCB/tangchao/novel_SS/All_info_table/sj12.RData")
+table(sj$annotation)
+#      0      1
+# 693517 176529
+
+sj <- sj[sj$annotation == 0, ]
+sum(is.na(sj[,42]) & !is.na(sj[,43]))
+# [1] 38209
+sum(!is.na(sj[,42]) & is.na(sj[,43]))
+# [1] 38287
+sum(!is.na(sj[,42]) & !is.na(sj[,43]))
+# [1] 22967
+sum(is.na(sj[,42]) & is.na(sj[,43]))
+# [1] 594054
+
+Known junction: 176529
+Unannotated junction: 594054
+Unannotated donor: 38287
+Unannotated acceptor: 38209
+Unannotated pattern: 22967
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,19 @@
+#### download SRA {SRR|ERR|DRR} files from NCBI
+# https://www.ncbi.nlm.nih.gov/books/NBK158899/
+
+# SRR5970395
+
+ascp -i /home/tangchao/.aspera/connect/etc/asperaweb_id_dsa.openssh -k 1 -T -l 500m anonftp@ftp.ncbi.nlm.nih.gov:/sra/sra-instant/reads/ByRun/sra/SRR/SRR597/SRR5970395/SRR5970395.sra /mnt/data5/BGI/UCB/tangchao/data/Bulk/Jurkat
+
+
+fastq-dump --split-3 SRR5970395.sra --gzip
+
+
+STAR --runThreadN 12 \
+	 --outSAMtype BAM SortedByCoordinate  \
+	 --outBAMcompression 9 \
+	 --genomeDir /mnt/data1/reference/ensembl/human/star_index/ \
+	 --readFilesIn /mnt/data5/BGI/UCB/tangchao/data/Bulk/Jurkat/SRR5970395_1.fastq.gz /mnt/data5/BGI/UCB/tangchao/data/Bulk/Jurkat/SRR5970395_2.fastq.gz \
+	 --outFileNamePrefix /mnt/data5/BGI/UCB/tangchao/data/Bulk/Jurkat/STAR/SRR5970395. \
+	 --readFilesCommand zcat
+

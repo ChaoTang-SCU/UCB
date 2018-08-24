@@ -373,8 +373,7 @@ for (i in 1:nrow(psi)){
   		geom_point(aes(colour = as.numeric(psi[i,row.names(tsne)])), size = .6)+
   		scale_colour_gradient(low = "grey80", high = "#EF3B2C", na.value = "grey90", guide = guide_legend(title = "PSI"))+
   		ggtitle(row.names(psi)[i])+
-  		theme(panel.background = element_blank())
-)
+  		theme(panel.background = element_blank()))
 }#statements
 
 dev.off()

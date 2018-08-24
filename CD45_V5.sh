@@ -495,5 +495,48 @@ dev.off()
 
 
 
+cd /mnt/nfs_nas/EGAD00001002671/EGAD00001002671_bam_decrypted
+for f in `ls *mRNA*bam | head -n 10`
+do 
+mkdir /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/result_bulk/Tcell/${f:0:15}
+bedtools intersect -a /mnt/nfs_nas/EGAD00001002671/EGAD00001002671_bam_decrypted/$f -b /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/CD45_e3_7_hg19.bed > /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.bam
+/mnt/data7/tangchao/biosoft/samtools-1.8/samtools fastq -n -t /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.bam > /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.fq
+hisat2 -x /mnt/data4/reference/GRCh38/grch38_snp_tran/genome_snp_tran --dta -U /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.fq > /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.sam
+/mnt/data7/tangchao/biosoft/samtools-1.8/samtools view -bS /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.sam | /mnt/data7/tangchao/biosoft/samtools-1.8/samtools sort - > /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.sorted.bam
+/home/zhaoyuancun/bin/stringtie-1.3.4c/stringtie -G /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/custom.gff -e -B /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.sorted.bam -o /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/result_bulk/Tcell/${f:0:15}/${f:0:15}.txt
+rm /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/$f*
+done
+
+
+
+cd /mnt/nfs_nas/EGAD00001002674/EGAD00001002674_bam_decrypted
+for f in `ls *bam | head -n 10`
+do 
+mkdir /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/result_bulk/Monocytes/${f:0:15}
+bedtools intersect -a /mnt/nfs_nas/EGAD00001002674/EGAD00001002674_bam_decrypted/$f -b /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/CD45_e3_7_hg19.bed > /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.bam
+/mnt/data7/tangchao/biosoft/samtools-1.8/samtools fastq -n -t /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.bam > /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.fq
+hisat2 -x /mnt/data4/reference/GRCh38/grch38_snp_tran/genome_snp_tran --dta -U /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.fq > /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.sam
+/mnt/data7/tangchao/biosoft/samtools-1.8/samtools view -bS /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.sam | /mnt/data7/tangchao/biosoft/samtools-1.8/samtools sort - > /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.sorted.bam
+/home/zhaoyuancun/bin/stringtie-1.3.4c/stringtie -G /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/custom.gff -e -B /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}.sorted.bam -o /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/result_bulk/Monocytes/${f:0:15}/${f:0:15}.txt
+rm /mnt/data5/BGI/UCB/tangchao/CD45/CD45_v5/tmp/${f:0:15}*
+done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
